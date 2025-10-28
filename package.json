@@ -4,6 +4,9 @@
   "description": "",
   "main": "index.ts",
   "scripts": {
+    "build": "tsc",
+    "start": "node dist/index.js",
+    "dev": "tsc && node dist/index.js",
     "test": "echo \"Error: no test specified\" && exit 1"
   },
   "keywords": [],
@@ -11,10 +14,15 @@
   "license": "ISC",
   "type": "module",
   "dependencies": {
-    "@triton-one/yellowstone-grpc": "^4.0.2"
+    "@noble/hashes": "^2.0.1",
+    "@solana/kit": "^5.0.0",
+    "@triton-one/yellowstone-grpc": "^4.0.2",
+    "bs58": "^6.0.0"
   },
   "devDependencies": {
+    "@tsconfig/recommended": "^1.0.10",
     "dotenv": "^17.2.3",
-    "nodemon": "^3.1.10"
+    "nodemon": "^3.1.10",
+    "typescript": "^5.0.0"
   }
 }

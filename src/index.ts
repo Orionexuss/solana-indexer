@@ -1,9 +1,10 @@
 import Client, {
-  CommitmentLevel,
   SubscribeRequest,
 } from "@triton-one/yellowstone-grpc";
 import dotenv from "dotenv";
 import bs58 from "bs58";
+import { type TransactionForFullJson } from "@solana/kit";
+import { parseTx } from "./utils/parser.js";
 
 dotenv.config();
 
@@ -14,7 +15,6 @@ async function main() {
     throw new Error("GRPC_ENDPOINT not defined");
   }
 
-  const commitment = CommitmentLevel.CONFIRMED;
   const grpcToken = process.env.GRPC_TOKEN;
   const client = new Client(grpcEndpoint, grpcToken, undefined);
 
@@ -23,18 +23,23 @@ async function main() {
 
   // Handle updates
   stream.on("data", (data) => {
-    console.log(`This is the data ${data}`)
-
     if (data.transaction) {
-      if (count === 1) {
+      if (count === 100) {
         console.log("Received 1 transaction, exiting...");
         process.exit(0);
       }
       count++;
-      const value = data.transaction.transaction;
-      const signature = data.transaction.transaction.signature
-      const sig = bs58.encode(signature)
-      console.log("data", value);
+      const tx = data.transaction.transaction as TransactionForFullJson<0>;
+      const signature = data.transaction.transaction.signature;
+      try {
+        parseTx(tx);
+        if (true) {
+          console.log("Parsed Jupiter transaction successfully");
+        }
+      } catch (e) {
+        console.error("Error parsing transaction:", e);
+      }
+      const sig = bs58.encode(signature);
       console.log("signature", sig);
     }
     return;
@@ -47,8 +52,9 @@ async function main() {
     transactions: {
       jupiter: {
         vote: false,
+        failed: false,
         accountInclude: ["JUP6LkbZbjS1jKKwapdHNy74zcZ3tLUZoi5QNyVTaV4"],
-        accountExclude: [],
+        accountExclude: ["B3111yJCeHBcA1bizdJjUFPALfhAfSRnAbJzGUtnt56A"],
         accountRequired: [],
       },
     },
