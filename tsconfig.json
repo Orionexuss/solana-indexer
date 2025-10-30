@@ -14,8 +14,8 @@
     "declarationMap": true,
     "sourceMap": true,
     "noEmit": false,
-    "allowImportingTsExtensions": true,
-    "emitDeclarationOnly": true
+    "allowImportingTsExtensions": false,
+    "emitDeclarationOnly": false
 
   },
   "include": ["src/**/*"],

@@ -31,8 +31,9 @@ async function main() {
       count++;
       const tx = data.transaction.transaction as TransactionForFullJson<0>;
       const signature = data.transaction.transaction.signature;
+      const slot = data.transaction.slot;
       try {
-        parseTx(tx);
+        parseTx(tx, slot);
         if (true) {
           console.log("Parsed Jupiter transaction successfully");
         }
