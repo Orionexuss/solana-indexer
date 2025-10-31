@@ -1,6 +1,4 @@
-import Client, {
-  SubscribeRequest,
-} from "@triton-one/yellowstone-grpc";
+import Client, { SubscribeRequest } from "@triton-one/yellowstone-grpc";
 import dotenv from "dotenv";
 import bs58 from "bs58";
 import { type TransactionForFullJson } from "@solana/kit";
@@ -20,28 +18,47 @@ async function main() {
 
   const stream = await client.subscribe();
   let count = 0;
+  type QueueItem = {
+    tx: TransactionForFullJson<0>;
+    signature: Uint8Array;
+    slot: number;
+  };
+  const queue: QueueItem[] = [];
+  let processing = false;
 
-  // Handle updates
-  stream.on("data", (data) => {
-    if (data.transaction) {
-      if (count === 100) {
-        console.log("Received 1 transaction, exiting...");
-        process.exit(0);
-      }
-      count++;
-      const tx = data.transaction.transaction as TransactionForFullJson<0>;
-      const signature = data.transaction.transaction.signature;
-      const slot = data.transaction.slot;
+  const processNext = async () => {
+    if (processing) return;
+    processing = true;
+    while (queue.length > 0) {
+      const item = queue.shift()!;
       try {
-        parseTx(tx, slot);
-        if (true) {
+        const detected = await parseTx(item.tx, item.slot);
+        if (detected) {
+          count++;
           console.log("Parsed Jupiter transaction successfully");
+          console.log("Transaction ", count);
+          const sig = bs58.encode(item.signature);
+          console.log("signature", sig);
         }
       } catch (e) {
         console.error("Error parsing transaction:", e);
       }
-      const sig = bs58.encode(signature);
-      console.log("signature", sig);
+      if (count === 100) {
+        console.log("Received 1 transaction, exiting...");
+        process.exit(0);
+      }
+    }
+    processing = false;
+  };
+
+  // Handle updates
+  stream.on("data", (data) => {
+    if (data.transaction) {
+      const tx = data.transaction.transaction as TransactionForFullJson<0>;
+      const signature = data.transaction.transaction.signature;
+      const slot = data.transaction.slot;
+      queue.push({ tx, signature, slot });
+      void processNext();
     }
     return;
   });

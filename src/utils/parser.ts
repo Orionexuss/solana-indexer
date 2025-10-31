@@ -15,7 +15,10 @@ import { db } from "../database/client.js";
 const arraysEqual = (a: Uint8Array, b: Uint8Array): boolean =>
   a.length === b.length && a.every((val, i) => val === b[i]);
 
-export async function parseTx(rpcTx: TransactionForFullJson<0>, slot: number) {
+export async function parseTx(
+  rpcTx: TransactionForFullJson<0>,
+  slot: number,
+): Promise<boolean> {
   if (!rpcTx) throw new Error("Unable to fetch transaction");
 
   // Extract signature and signer
@@ -24,10 +27,10 @@ export async function parseTx(rpcTx: TransactionForFullJson<0>, slot: number) {
   const signer = bs58.encode(
     Buffer.from(rpcTx.transaction.message.accountKeys[0]),
   );
-  const WSOL = address("So11111111111111111111111111111111111111112");
   const JUPITER_AGGREGATOR_V6 = address(
     "JUP6LkbZbjS1jKKwapdHNy74zcZ3tLUZoi5QNyVTaV4",
   );
+  const SOL_MINT = address("So11111111111111111111111111111111111111112");
 
   // Jupiter V6 instruction discriminators
   const discriminators = {
@@ -67,16 +70,19 @@ export async function parseTx(rpcTx: TransactionForFullJson<0>, slot: number) {
         instructionFound = "SHARED_ACCOUNTS_ROUTE";
       else if (arraysEqual(discriminator, discriminators.EXACT_OUT_ROUTE_V2))
         instructionFound = "EXACT_OUT_ROUTE_V2";
-      return programBase58 === JUPITER_AGGREGATOR_V6 && instructionFound;
+      return (
+        programBase58 === JUPITER_AGGREGATOR_V6.toString() &&
+        Boolean(instructionFound)
+      );
     },
   );
-  if (swapIxIdx === -1) return;
+  if (swapIxIdx === -1) return false;
 
   // Get inner instructions for Jupiter call
   const innerIxs = rpcTx.meta?.innerInstructions?.find(
     (innerIx) => innerIx.index === swapIxIdx,
   )?.instructions;
-  if (!innerIxs) return;
+  if (!innerIxs) return false;
 
   // Event discriminators
   const SWAP_EVENT_DISCRIMINATOR = sha256(
@@ -108,6 +114,7 @@ export async function parseTx(rpcTx: TransactionForFullJson<0>, slot: number) {
   ]);
 
   // Find SwapEvent logs in inner instructions
+  let foundAny = false;
   for (const ix of innerIxs) {
     const data: Uint8Array = new Uint8Array((ix as any).data as any);
     const eventDiscriminator = data.subarray(8, 16);
@@ -124,11 +131,12 @@ export async function parseTx(rpcTx: TransactionForFullJson<0>, slot: number) {
     ) {
       const event = SwapsEventDecoder.decode(eventData);
       for (const swap of event.swapEvents) {
+        // Verifies if SOL is involved
         if (
-          swap.inputMint.toString() === WSOL.toString() ||
-          swap.outputMint.toString() === WSOL.toString()
+          swap.inputMint.toString() === SOL_MINT.toString() ||
+          swap.outputMint.toString() === SOL_MINT.toString()
         ) {
-          console.log("SWAP DETECTED (V2):");
+          console.log("\nSWAP DETECTED (V2):");
           console.log("  Input Mint:", swap.inputMint.toString());
           console.log("  Input Amount:", swap.inputAmount.toString());
           console.log("  Output Mint:", swap.outputMint.toString());
@@ -154,13 +162,16 @@ export async function parseTx(rpcTx: TransactionForFullJson<0>, slot: number) {
               output_amount: Number(swap.outputAmount.toString()),
             },
           });
+          foundAny = true;
         }
       }
     } else {
       const event = SwapEventDecoder.decode(eventData);
+
+      // Verifies if SOL is involved
       if (
-        event.inputMint.toString() === WSOL.toString() ||
-        event.outputMint.toString() === WSOL.toString()
+        event.inputMint.toString() === SOL_MINT.toString() ||
+        event.outputMint.toString() === SOL_MINT.toString()
       ) {
         console.log("SWAP DETECTED:");
         console.log("  AMM:", event.amm.toString());
@@ -189,8 +200,9 @@ export async function parseTx(rpcTx: TransactionForFullJson<0>, slot: number) {
             output_amount: Number(event.outputAmount.toString()),
           },
         });
+        foundAny = true;
       }
-      return; // Stop after first match
     }
   }
+  return foundAny;
 }
