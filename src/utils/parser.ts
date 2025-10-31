@@ -173,7 +173,7 @@ export async function parseTx(
         event.inputMint.toString() === SOL_MINT.toString() ||
         event.outputMint.toString() === SOL_MINT.toString()
       ) {
-        console.log("SWAP DETECTED:");
+        console.log("\nSWAP DETECTED:");
         console.log("  AMM:", event.amm.toString());
         console.log("  Input Mint:", event.inputMint.toString());
         console.log("  Input Amount:", event.inputAmount.toString());
