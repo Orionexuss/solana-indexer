@@ -1,7 +1,9 @@
-import Client, { SubscribeRequest } from "@triton-one/yellowstone-grpc";
+import Client, {
+  SubscribeRequest,
+  type SubscribeUpdateTransactionInfo,
+} from "@triton-one/yellowstone-grpc";
 import dotenv from "dotenv";
 import bs58 from "bs58";
-import { type TransactionForFullJson } from "@solana/kit";
 import { parseTx } from "./utils/parser.js";
 
 dotenv.config();
@@ -19,9 +21,8 @@ async function main() {
   const stream = await client.subscribe();
   let count = 0;
   type QueueItem = {
-    tx: TransactionForFullJson<0>;
-    signature: Uint8Array;
-    slot: number;
+    tx: SubscribeUpdateTransactionInfo;
+    slot: string;
   };
   const queue: QueueItem[] = [];
   let processing = false;
@@ -37,7 +38,7 @@ async function main() {
           count++;
           console.log("Parsed Jupiter transaction successfully");
           console.log("Transaction ", count);
-          const sig = bs58.encode(item.signature);
+          const sig = bs58.encode(item.tx.signature);
           console.log("signature", sig);
         }
       } catch (e) {
@@ -53,11 +54,9 @@ async function main() {
 
   // Handle updates
   stream.on("data", (data) => {
-    if (data.transaction) {
-      const tx = data.transaction.transaction as TransactionForFullJson<0>;
-      const signature = data.transaction.transaction.signature;
-      const slot = data.transaction.slot;
-      queue.push({ tx, signature, slot });
+    const tx = data.transaction?.transaction;
+    if (tx) {
+      queue.push({ tx, slot: data.transaction.slot });
       void processNext();
     }
     return;
